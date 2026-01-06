@@ -1,16 +1,32 @@
-# This is a sample Python script.
+from exchange.binance_spot import BinanceSpot
+from strategy.ema_rsi import EMARsiStrategy
+from scanner import Scanner
+from trader import MultiSymbolTrader
+import os
 
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+if __name__ == "__main__":
 
+    symbols = [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT",
+        "BNBUSDT"
+    ]
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+    exchange = BinanceSpot(
+        api_key=os.getenv("BINANCE_API_KEY"),
+        api_secret=os.getenv("BINANCE_API_SECRET")
+    )
 
+    strategy = EMARsiStrategy()
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+    scanner = Scanner(exchange, strategy, symbols)
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    trader = MultiSymbolTrader(
+        exchange=exchange,
+        strategy=strategy,
+        symbols=symbols,
+        risk_pct=0.01
+    )
+
+    trader.run(scanner)
