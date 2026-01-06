@@ -1,8 +1,8 @@
+from config import config
 from exchange.binance_spot import BinanceSpot
 from strategy.ema_rsi import EMARsiStrategy
 from scanner import Scanner
 from trader import MultiSymbolTrader
-import os
 
 if __name__ == "__main__":
 
@@ -14,8 +14,8 @@ if __name__ == "__main__":
     ]
 
     exchange = BinanceSpot(
-        api_key=os.getenv("BINANCE_API_KEY"),
-        api_secret=os.getenv("BINANCE_API_SECRET")
+        api_key=config.binance.API_KEY,
+        api_secret=config.binance.SECRET_KEY
     )
 
     strategy = EMARsiStrategy()

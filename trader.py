@@ -96,6 +96,7 @@ class MultiSymbolTrader:
 
     def run(self, scanner):
         while True:
+            print("hi king")
             signals = scanner.scan()
 
             for symbol in signals:
@@ -104,7 +105,7 @@ class MultiSymbolTrader:
                     self.open_trade(symbol, df)
 
             self.manage_trades(scanner)
-            time.sleep(30)
+            time.sleep(30) #wait for 30 seconds
 
     def close_trade(self, symbol, trade, price, reason):
         self.exchange.market_sell(symbol, trade.qty)

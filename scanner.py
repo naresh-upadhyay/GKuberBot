@@ -30,7 +30,7 @@ class Scanner:
         for symbol in self.symbols:
             try:
                 df = self.fetch_klines(symbol)
-                df = self.strategy.prepare(df)
+                df = self.strategy.prepare_indicators(df)
 
                 if self.strategy.should_buy(df):
                     signals.append(symbol)

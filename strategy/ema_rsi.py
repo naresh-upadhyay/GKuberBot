@@ -10,7 +10,8 @@ class EMARsiStrategy:
         rsi_period=14,
         rsi_min=50,
         rsi_max=70,
-        risk_reward=2.0
+        risk_reward=2.0,
+        atr_period=14
     ):
         self.ema_fast = ema_fast
         self.ema_slow = ema_slow
@@ -18,12 +19,13 @@ class EMARsiStrategy:
         self.rsi_min = rsi_min
         self.rsi_max = rsi_max
         self.risk_reward = risk_reward
+        self.atr_period = atr_period
 
     def prepare_indicators(self, df):
         df["ema_fast"] = ema(df["close"], self.ema_fast)
         df["ema_slow"] = ema(df["close"], self.ema_slow)
         df["rsi"] = rsi(df["close"], self.rsi_period)
-        df["atr"] = atr(df, period=14)
+        df["atr"] = atr(df, self.atr_period)
         return df
 
     def check_entry(self, df, i):
@@ -36,7 +38,7 @@ class EMARsiStrategy:
         )
 
         rsi_ok = self.rsi_min < curr["rsi"] < self.rsi_max
-
+        #todo - add atr indicator as well
         return ema_cross_up and rsi_ok
 
     def get_trade_levels(self, entry_price):
