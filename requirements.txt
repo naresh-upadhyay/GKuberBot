@@ -1,6 +1,6 @@
 python-binance
 python-dotenv
-
-binance
 pandas
 requests
+cryptography
+websocket-client
