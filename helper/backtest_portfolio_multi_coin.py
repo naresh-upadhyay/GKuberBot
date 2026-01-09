@@ -4,10 +4,10 @@ from binance.client import Client
 import ta
 
 # ===================== CONFIG =====================
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+SYMBOLS = ["PEPEUSDT", "DOGEUSDT", "SHIBUSDT", "FLOKIUSDT"]
 INTERVAL = Client.KLINE_INTERVAL_1HOUR
-START_DATE = "1 Jan 2024"
-END_DATE = "1 Jan 2025"
+START_DATE = "1 Jan 2023"
+END_DATE = "1 Jan 2024"
 
 INITIAL_BALANCE = 10000.0
 RISK_PER_TRADE = 0.005          # 0.5% risk

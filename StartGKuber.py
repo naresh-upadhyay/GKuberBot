@@ -61,8 +61,8 @@ SOCKET_15M = "wss://stream.binance.com:9443/ws/pepeusdt@kline_15m"
 SOCKET_1M  = "wss://stream.binance.com:9443/ws/pepeusdt@kline_1m"
 
 # ---- MACD SETTINGS ----
-FAST = 12
-SLOW = 26
+FAST = 7
+SLOW = 25
 SIGNAL = 9
 
 # ---- ATR ----

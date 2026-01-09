@@ -6,7 +6,7 @@ import ta
 # ================= CONFIG =================
 SYMBOL = "PEPEUSDT"
 INTERVAL = Client.KLINE_INTERVAL_4HOUR
-START_DATE = "1 Jan 2025"
+START_DATE = "1 Jun 2025"
 END_DATE   = "1 Jan 2026"
 
 INITIAL_BALANCE = 10_000.0

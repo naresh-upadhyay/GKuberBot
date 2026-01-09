@@ -4,17 +4,17 @@ from binance.client import Client
 import ta
 
 # ================= CONFIG =================
-SYMBOL = "SHIBUSDT"
+SYMBOL = "PEPEUSDT"
 INTERVAL = Client.KLINE_INTERVAL_4HOUR
-START_DATE = "1 Jan 2024"
+START_DATE = "1 Jan 2023"
 END_DATE   = "8 Jan 2026"
 
-INITIAL_BALANCE = 10_000.0
+INITIAL_BALANCE = 10000.0
 RISK_PER_TRADE = 0.01
 FEE_PCT = 0.001
 
 ATR_PERIOD = 14
-ATR_MULT = 2.0
+ATR_MULT = 1.0 #yearly profit may increase or decrease(good is 1 or 2)
 # ==========================================
 
 client = Client()

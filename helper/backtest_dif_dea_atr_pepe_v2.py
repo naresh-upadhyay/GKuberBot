@@ -7,8 +7,8 @@ getcontext().prec = 28
 
 # ================= CONFIG =================
 SYMBOL = "PEPEUSDT"
-START = "1 Jan 2024"
-END   = "1 Jan 2025"
+START = "1 Jan 2023"
+END   = "1 Jan 2024"
 
 FAST = 12
 SLOW = 26
@@ -24,7 +24,7 @@ TP1_RATIO = Decimal("0.5")
 RISK_PERCENT = Decimal("0.01")
 FEE_RATE = Decimal("0.001")
 
-START_BALANCE = Decimal("1000")
+START_BALANCE = Decimal("10000")
 COOLDOWN_BARS = 30   # 30 minutes
 
 # ================= CLIENT =================
@@ -48,8 +48,8 @@ def load_klines(interval):
     return df[["time","o","h","l","c"]]
 
 print("📥 Loading data...")
-df15 = load_klines(Client.KLINE_INTERVAL_15MINUTE)
-df1  = load_klines(Client.KLINE_INTERVAL_1MINUTE)
+df15 = load_klines(Client.KLINE_INTERVAL_4HOUR)
+df1  = load_klines(Client.KLINE_INTERVAL_15MINUTE)
 
 # ================= INDICATORS =================
 # ---- 15m trend ----
