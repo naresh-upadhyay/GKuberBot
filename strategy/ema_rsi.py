@@ -1,5 +1,4 @@
 from strategy.indicators import ema, rsi, atr
-from backtest.position_sizing import calculate_position_size
 
 class EMARsiStrategy:
 
@@ -48,13 +47,6 @@ class EMARsiStrategy:
         )
         return stop_loss, take_profit
 
-    def position_size(self, balance, risk_pct, entry, stop):
-        return calculate_position_size(
-            balance=balance,
-            risk_pct=risk_pct,
-            entry_price=entry,
-            stop_loss_price=stop
-        )
 
     def should_buy(self, df):
         prev = df.iloc[-2]

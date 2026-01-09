@@ -1,7 +1,6 @@
 import time
 from trading.risk_manager import RiskManager
 from risk.position_sizing import position_size_from_risk
-from logger import logger
 from trading.trailing_atr import ATRTrailingStopManager
 from trading.trade_state import TradeState
 from utils.telegram import TelegramNotifier
@@ -60,7 +59,6 @@ class MultiSymbolTrader:
         )
 
         self.risk_manager.register_trade(symbol, trade)
-        logger.info(f"🚀 BUY {symbol} @ {entry}")
 
         self.exchange.market_buy(symbol, qty)
 
@@ -87,11 +85,11 @@ class MultiSymbolTrader:
             if price <= trade.stop:
                 self.exchange.market_sell(symbol, trade.qty)
                 self.risk_manager.close_trade(symbol)
-                logger.warning(f"🛑 ATR STOP HIT {symbol}")
+                #logger.warning(f"🛑 ATR STOP HIT {symbol}")
             elif price >= trade.target:
                 self.exchange.market_sell(symbol, trade.qty)
                 self.risk_manager.close_trade(symbol)
-                logger.info(f"🎯 TARGET HIT {symbol}")
+                #logger.info(f"🎯 TARGET HIT {symbol}")
 
 
     def run(self, scanner):
