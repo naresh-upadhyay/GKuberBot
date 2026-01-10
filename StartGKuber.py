@@ -1,197 +1,160 @@
+import os, json, threading
+import pandas as pd
+import ta
+import websocket
+from binance.client import Client
+from dotenv import load_dotenv
 
-"""from utils.telegram import TelegramNotifier
+from utils.telegram import TelegramNotifier
 
-notifier = TelegramNotifier()
-
-notifier.send(
-    f"🚀 <b>BUY</b>\n"
-    f"Symbol: BTCUSDT\n"
-    f"Entry: 42350\n"
-    f"SL: 41920\n"
-    f"TP: 43210\n"
-    f"Qty: 0.012"
+# ================= ENV =================
+load_dotenv()
+client = Client(
+    os.getenv("BINANCE_API_KEY"),
+    os.getenv("BINANCE_API_SECRET")
 )
 
+# ================= CONFIG =================
+SYMBOLS = ["PEPEUSDT", "DOGEUSDT", "SHIBUSDT", "FLOKIUSDT"]
+INTERVAL = Client.KLINE_INTERVAL_4HOUR
 
-https://api.binance.com
-https://api-gcp.binance.com
-https://api1.binance.com
-https://api2.binance.com
-https://api3.binance.com
-https://api4.binance.com
+INITIAL_BALANCE = 10000.0
+RISK_PER_TRADE = 0.01
+FEE_PCT = 0.001
 
-Key	Value
-apiKey	vmPUZE6mv9SD5VNHk4HlWFsOr6aKE2zvsw0MuIgwCIPy6utIco14y7Ju91duEh8A
-secretKey	NhqPtmdSJYdKjVHjA7PZj4Mge3R5YNiP1e3UZjInClVN65XAbvqqM6A7H5fATj0j
-
-Example of request with a symbol name comprised entirely of ASCII characters:
-Parameter	Value
-symbol	LTCBTC
-side	BUY
-type	LIMIT
-timeInForce	GTC
-quantity	1
-price	0.1
-recvWindow	5000
-timestamp	1499827319559
-curl -s -v -H "X-MBX-APIKEY: $apiKey" -X POST "https://api.binance.com/api/v3/order?symbol=LTCBTC&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1&recvWindow=5000&timestamp=1499827319559&signature=c8db56825ae71d6d79447849e617115f4a920fa2acdcab2b053c4b2838bd6b71"
-
-Example of request with a symbol name comprised entirely of ASCII characters:
-
-Parameter	Value
-symbol	BTCUSDT
-side	SELL
-type	LIMIT
-timeInForce	GTC
-quantity	1
-price	0.2
-timestamp	1668481559918
-recvWindow	5000
-
-
-"""
-
-import json
-import websocket
-import threading
-from datetime import datetime
-
-# ---- SOCKETS ----
-SOCKET_15M = "wss://stream.binance.com:9443/ws/pepeusdt@kline_15m"
-SOCKET_1M  = "wss://stream.binance.com:9443/ws/pepeusdt@kline_1m"
-
-# ---- MACD SETTINGS ----
-FAST = 7
-SLOW = 25
-SIGNAL = 9
-
-# ---- ATR ----
 ATR_PERIOD = 14
-ATR_MULTIPLIER = 2.5
+ATR_MULT = 1.0
 
-# ---- 15m STATE (TREND) ----
-ema_fast_15 = ema_slow_15 = dea_15 = None
-prev_dif_15 = prev_dea_15 = None
-trend_bullish = False
+# ================= STATE =================
+state = {
+    s: {
+        "df": pd.DataFrame(),
+        "balance": INITIAL_BALANCE,
+        "qty": 0.0,
+        "entry": 0.0,
+        "sl": 0.0
+    } for s in SYMBOLS
+}
 
-# ---- 1m STATE (ENTRY) ----
-ema_fast_1 = ema_slow_1 = dea_1 = None
-prev_dif_1 = prev_dea_1 = None
 
-atr = None
-prev_close = None
+notifier = TelegramNotifier()
+# ================= INDICATORS =================
+def add_indicators(df):
+    df["rsi6"] = ta.momentum.RSIIndicator(df["close"], 6).rsi()
+    macd = ta.trend.MACD(df["close"])
+    df["dif"] = macd.macd()
+    df["dea"] = macd.macd_signal()
+    df["dif_prev"] = df["dif"].shift(1)
+    df["dea_prev"] = df["dea"].shift(1)
+    df["atr"] = ta.volatility.AverageTrueRange(
+        df["high"], df["low"], df["close"], ATR_PERIOD
+    ).average_true_range()
+    return df
 
-in_position = False
-entry_price = None
-trailing_sl = None
+# ================= TRADING =================
+def buy(symbol, price, atr):
+    s = state[symbol]
+    s["entry"] = price
+    s["sl"] = price - atr * ATR_MULT
 
-# ---- HELPERS ----
-def ema(val, prev, period):
-    k = 2 / (period + 1)
-    return val if prev is None else val * k + prev * (1 - k)
+    risk_amt = s["balance"] * RISK_PER_TRADE
+    qty = min(
+        risk_amt / (price - s["sl"]),
+        s["balance"] / price
+    )
 
-def update_atr(high, low, close):
-    global atr, prev_close
-    if prev_close is None:
-        prev_close = close
-        return None
-    tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
-    atr = tr if atr is None else (atr * (ATR_PERIOD - 1) + tr) / ATR_PERIOD
-    prev_close = close
-    return atr
-
-# ---- 15m HANDLER (TREND FILTER) ----
-def on_15m(ws, msg):
-    global ema_fast_15, ema_slow_15, dea_15
-    global prev_dif_15, prev_dea_15, trend_bullish
-
-    k = json.loads(msg)['k']
-    if not k['x']:
+    qty = round(qty, 0)
+    if qty <= 0:
         return
 
-    close = float(k['c'])
-    time = datetime.fromtimestamp(k['T'] / 1000)
+    #client.order_market_buy(symbol=symbol, quantity=qty)
+    s["qty"] = qty
+    s["balance"] -= qty * price * FEE_PCT
+    notifier.send(
+        f"🚀 <b>BUY</b>\n"
+        f"Symbol: {symbol}\n"
+        f"SL: {s["sl"]}\n"
+        f"Price: {price:.8f}\n"
+        f"Qty: {qty}"
+    )
 
-    ema_fast_15 = ema(close, ema_fast_15, FAST)
-    ema_slow_15 = ema(close, ema_slow_15, SLOW)
+    print(f"🟢 {symbol} BUY {qty} @ {price:.8f}")
 
-    dif = ema_fast_15 - ema_slow_15
-    dea_15 = ema(dif, dea_15, SIGNAL)
-    hist = dif - dea_15
+def sell(symbol, price):
+    s = state[symbol]
+    #client.order_market_sell(symbol=symbol, quantity=s["qty"])
 
-    if prev_dif_15 is not None:
-        trend_bullish = dif > dea_15 and hist > 0
+    pnl = s["qty"] * (price - s["entry"])
+    s["balance"] += pnl
+    s["balance"] -= s["qty"] * price * FEE_PCT
 
-    prev_dif_15, prev_dea_15 = dif, dea_15
+    notifier.send(
+        f"🔴 <b>SELL</b>\n"
+        f"Symbol: {symbol}\n"
+        f"Balance: {s["balance"]:.8f}\n"
+        f"Price: {price:.8f}\n"
+        f"PnL: {pnl:.2f}"
+    )
 
-    print(f"[15m] {time} DIF:{dif:.8f} DEA:{dea_15:.8f} TREND:{trend_bullish}")
+    print(f"🔴 {symbol} SELL @ {price:.8f} PnL={pnl:.2f}")
+    s["qty"] = 0
 
-# ---- 1m HANDLER (ENTRY + EXIT) ----
-def on_1m(ws, msg):
-    global ema_fast_1, ema_slow_1, dea_1
-    global prev_dif_1, prev_dea_1
-    global in_position, entry_price, trailing_sl
+# ================= WS HANDLER =================
+def start_socket(symbol):
+    socket = f"wss://stream.binance.com:9443/ws/{symbol.lower()}@kline_{INTERVAL}"
 
-    if not trend_bullish:
-        return  # 🚫 NO TREND → NO TRADE
+    def on_message(ws, msg):
+        k = json.loads(msg)["k"]
+        print(f"Close? {k['close']}\n")
+        print(k)
+        if not k["x"]:
+            return
 
-    k = json.loads(msg)['k']
-    if not k['x']:
-        return
+        candle = {
+            "time": pd.to_datetime(k["t"], unit="ms"),
+            "open": float(k["o"]),
+            "high": float(k["h"]),
+            "low": float(k["l"]),
+            "close": float(k["c"]),
+            "volume": float(k["v"])
+        }
 
-    close = float(k['c'])
-    high = float(k['h'])
-    low = float(k['l'])
-    time = datetime.fromtimestamp(k['T'] / 1000)
+        s = state[symbol]
+        s["df"] = pd.concat(
+            [s["df"], pd.DataFrame([candle])],
+            ignore_index=True
+        )
 
-    ema_fast_1 = ema(close, ema_fast_1, FAST)
-    ema_slow_1 = ema(close, ema_slow_1, SLOW)
+        s["df"] = add_indicators(s["df"])
+        if len(s["df"]) < 50:
+            return
 
-    dif = ema_fast_1 - ema_slow_1
-    dea_1 = ema(dif, dea_1, SIGNAL)
-    hist = dif - dea_1
+        row = s["df"].iloc[-1]
 
-    atr_val = update_atr(high, low, close)
+        if s["qty"] == 0:
+            if (
+                row["rsi6"] > 30 and
+                row["dif_prev"] < row["dea_prev"] and
+                row["dif"] > row["dea"]
+            ):
+                buy(symbol, row["close"], row["atr"])
 
-    if prev_dif_1 is None or atr_val is None:
-        prev_dif_1, prev_dea_1 = dif, dea_1
-        return
+        else:
+            if row["low"] <= s["sl"]:
+                sell(symbol, s["sl"])
 
-    print(f"[1m ] {time} DIF:{dif:.8f} DEA:{dea_1:.8f} ATR:{atr_val:.8f}")
+            elif (
+                row["rsi6"] < 60 and
+                row["dif_prev"] > row["dea_prev"] and
+                row["dif"] < row["dea"]
+            ):
+                sell(symbol, row["close"])
 
-    # 🟢 ENTRY
-    if (
-        not in_position and
-        prev_dif_1 < prev_dea_1 and
-        dif > dea_1 and
-        hist > 0
-    ):
-        in_position = True
-        entry_price = close
-        trailing_sl = close - atr_val * ATR_MULTIPLIER
-        print(f"🟢 BUY @ {entry_price:.8f} SL:{trailing_sl:.8f}")
+    ws = websocket.WebSocketApp(socket, on_message=on_message)
+    ws.run_forever()
 
-    # 🔁 TRAIL
-    elif in_position:
-        trailing_sl = max(trailing_sl, close - atr_val * ATR_MULTIPLIER)
+# ================= START ALL =================
+for sym in SYMBOLS:
+    threading.Thread(target=start_socket, args=(sym,), daemon=True).start()
 
-        if close <= trailing_sl:
-            print(f"❌ EXIT (ATR) @ {close:.8f}")
-            in_position = False
-
-        elif prev_dif_1 > prev_dea_1 and dif < dea_1:
-            print(f"🔴 EXIT (MACD) @ {close:.8f}")
-            in_position = False
-
-    prev_dif_1, prev_dea_1 = dif, dea_1
-
-# ---- START ----
-def start():
-    ws15 = websocket.WebSocketApp(SOCKET_15M, on_message=on_15m)
-    ws1  = websocket.WebSocketApp(SOCKET_1M, on_message=on_1m)
-
-    threading.Thread(target=ws15.run_forever, daemon=True).start()
-    ws1.run_forever()
-
-if __name__ == "__main__":
-    start()
+input("🚀 Multi-pair bot running. Press ENTER to stop\n")

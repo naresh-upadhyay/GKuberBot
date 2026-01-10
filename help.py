@@ -1,154 +1,152 @@
+import os
 import json
+import pandas as pd
+import ta
 import websocket
-from datetime import datetime
+from binance.client import Client
+from dotenv import load_dotenv
 
-# Binance Kline WebSocket URL
-# Format: symbol@kline_interval
-SOCKET = "wss://stream.binance.com:9443/ws/pepeusdt@kline_1m"
+# ================= LOAD ENV =================
+load_dotenv()
+API_KEY = os.getenv("BINANCE_API_KEY")
+API_SECRET = os.getenv("BINANCE_API_SECRET")
 
+# ================= CONFIG =================
+SYMBOL = "PEPEUSDT"
+INTERVAL = Client.KLINE_INTERVAL_1SECOND
+#INTERVAL = Client.KLINE_INTERVAL_4HOUR
+SOCKET = f"wss://stream.binance.com:9443/ws/{SYMBOL.lower()}@kline_{INTERVAL}"
 
-EMA_FAST = 9
-EMA_SLOW = 21
-RSI_PERIOD = 14
+INITIAL_BALANCE = 10_000.0
+RISK_PER_TRADE = 0.01
+FEE_PCT = 0.001
 
-closes = []
+ATR_PERIOD = 14
+ATR_MULT = 1.0
 
-ema_fast = None
-ema_slow = None
-prev_ema_fast = None
-prev_ema_slow = None
+# ================= CLIENT =================
+client = Client(API_KEY, API_SECRET)
 
-avg_gain = None
-avg_loss = None
-prev_close = None
+# ================= STATE =================
+df = pd.DataFrame()
+balance = INITIAL_BALANCE
+qty = 0.0
+entry = 0.0
+sl = 0.0
 
-in_position = False
+# ================= HELPERS =================
+def add_indicators(df):
+    df["rsi6"] = ta.momentum.RSIIndicator(df["close"], 6).rsi()
+    macd = ta.trend.MACD(df["close"])
+    df["dif"] = macd.macd()
+    df["dea"] = macd.macd_signal()
+    df["dif_prev"] = df["dif"].shift(1)
+    df["dea_prev"] = df["dea"].shift(1)
+    df["atr"] = ta.volatility.AverageTrueRange(
+        df["high"], df["low"], df["close"], ATR_PERIOD
+    ).average_true_range()
+    return df
 
-def calculate_ema(price, prev_ema, period):
-    k = 2 / (period + 1)
-    if prev_ema is None:
-        return price
-    return price * k + prev_ema * (1 - k)
+def place_buy(price, atr):
+    global qty, entry, sl, balance
 
-def calculate_wilder_rsi(close):
-    global avg_gain, avg_loss, prev_close
+    entry = price
+    sl = entry - atr * ATR_MULT
 
-    if prev_close is None:
-        prev_close = close
-        return None
+    risk_amt = balance * RISK_PER_TRADE
+    qty = min(
+        risk_amt / (entry - sl),
+        balance / entry
+    )
 
-    change = close - prev_close
-    gain = max(change, 0)
-    loss = max(-change, 0)
+    qty = round(qty, 0)  # PEPE integer qty
 
-    # First RSI calculation
-    if avg_gain is None or avg_loss is None:
-        closes.append(close)
-        if len(closes) < RSI_PERIOD + 1:
-            prev_close = close
-            return None
+    if qty <= 0:
+        return
 
-        gains = []
-        losses = []
-        for i in range(1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
+    #client.order_market_buy(symbol=SYMBOL, quantity=qty)
+    balance -= qty * entry * FEE_PCT
 
-        avg_gain = sum(gains[-RSI_PERIOD:]) / RSI_PERIOD
-        avg_loss = sum(losses[-RSI_PERIOD:]) / RSI_PERIOD
+    print(f"🟢 BUY {qty} @ {entry:.8f} SL={sl:.8f}")
 
-    else:
-        avg_gain = (avg_gain * (RSI_PERIOD - 1) + gain) / RSI_PERIOD
-        avg_loss = (avg_loss * (RSI_PERIOD - 1) + loss) / RSI_PERIOD
+def place_sell(price):
+    global qty, balance, entry
 
-    prev_close = close
+    #client.order_market_sell(symbol=SYMBOL, quantity=qty)
 
-    if avg_loss == 0:
-        return 100
+    pnl = qty * (price - entry)
+    balance += pnl
+    balance -= qty * price * FEE_PCT
 
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+    print(f"🔴 SELL {qty} @ {price:.8f} PnL={pnl:.2f} Bal={balance:.2f}")
 
-def on_open(ws):
-    print("Connected to Binance WebSocket")
+    qty = 0
 
+# ================= WS CALLBACK =================
 def on_message(ws, message):
-    global ema_fast, ema_slow, prev_ema_fast, prev_ema_slow, in_position
+    global df, qty
 
-    data = json.loads(message)
-    kline = data['k']
+    msg = json.loads(message)
+    k = msg["k"]
 
-    if kline['x']:  # candle closed
-        close_price = float(kline['c'])
-        close_time = datetime.fromtimestamp(kline['T'] / 1000)
+    # Only CLOSED candle
+    if not k["x"]:
+        return
 
-        prev_ema_fast = ema_fast
-        prev_ema_slow = ema_slow
+    candle = {
+        "time": pd.to_datetime(k["t"], unit="ms"),
+        "open": float(k["o"]),
+        "high": float(k["h"]),
+        "low": float(k["l"]),
+        "close": float(k["c"]),
+        "volume": float(k["v"]),
+    }
 
-        ema_fast = calculate_ema(close_price, ema_fast, EMA_FAST)
-        ema_slow = calculate_ema(close_price, ema_slow, EMA_SLOW)
+    df = pd.concat([df, pd.DataFrame([candle])], ignore_index=True)
+    df = add_indicators(df)
 
-        rsi = calculate_wilder_rsi(close_price)
+    if len(df) < 50:
+        return
 
-        print("RSI:", rsi)
-        print("Close:", close_price)
-        print("CloseTime:", close_time)
-        print(closes)
-        if not rsi or not prev_ema_fast or not prev_ema_slow:
-            return
+    row = df.iloc[-1]
 
-        print(
-            f"[{close_time}] "
-            f"Close: {close_price} | "
-            f"EMA9 prev_ema_fast: {prev_ema_fast:.8f} | "
-            f"EMA21 prev_ema_slow: {prev_ema_slow:.8f} | "
-            f"EMA9 ema_fast: {ema_fast:.8f} | "
-            f"EMA21 ema_slow: {ema_slow:.8f} | "
-            f"RSI: {round(rsi,2)} |"
-            f"InPos: {in_position}"
-        )
-
-        # ✅ Clean RSI + EMA strategy
+    # ===== ENTRY =====
+    if qty == 0:
         if (
-            not in_position and
-            prev_ema_fast < prev_ema_slow and
-            ema_fast > ema_slow and
-            40 < rsi < 70
+            row["rsi6"] > 30
+            and row["dif_prev"] < row["dea_prev"]
+            and row["dif"] > row["dea"]
         ):
-            in_position = True
-            print("🟢 STRONG BUY SIGNAL")
+            place_buy(row["close"], row["atr"])
+
+    # ===== EXIT =====
+    else:
+        if row["low"] <= sl:
+            place_sell(sl)
 
         elif (
-            in_position and
-            prev_ema_fast > prev_ema_slow and
-            ema_fast < ema_slow and
-            rsi < 60
+            row["rsi6"] < 60
+            and row["dif_prev"] > row["dea_prev"]
+            and row["dif"] < row["dea"]
         ):
-            in_position = False
-            print("🔴 STRONG SELL SIGNAL")
+            place_sell(row["close"])
 
+def on_open(ws):
+    print("✅ WebSocket Connected")
 
 def on_error(ws, error):
-    print("Error:", error)
+    print("❌ WS Error:", error)
 
+def on_close(ws):
+    print("🔌 WebSocket Closed")
 
-def on_close(ws, close_status_code, close_msg):
-    print("🔌 WebSocket closed")
-    print("Status code:", close_status_code)
-    print("Message:", close_msg)
+# ================= START =================
+ws = websocket.WebSocketApp(
+    SOCKET,
+    on_message=on_message,
+    on_open=on_open,
+    on_error=on_error,
+    on_close=on_close
+)
 
-if __name__ == "__main__":
-    ws = websocket.WebSocketApp(
-        SOCKET,
-        on_open=on_open,
-        on_message=on_message,
-        on_error=on_error,
-        on_close=on_close
-    )
-    while True:
-        try:
-            ws.run_forever()
-        except Exception as e:
-            print("Reconnecting...", e)
+ws.run_forever()
