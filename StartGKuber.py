@@ -104,8 +104,13 @@ def start_socket(symbol):
     socket = f"wss://stream.binance.com:9443/ws/{symbol.lower()}@kline_{INTERVAL}"
 
     def on_message(ws, msg):
-        k = json.loads(msg)["k"]
-        print(f"Close? {k['close']}\n")
+        msg = json.loads(msg)
+
+        # Ignore non-kline messages
+        if 'e' not in msg or msg['e'] != 'kline':
+            return
+
+        k = msg['k']
         print(k)
         if not k["x"]:
             return
