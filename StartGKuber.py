@@ -40,6 +40,8 @@ state = {
 notifier = TelegramNotifier()
 # ================= INDICATORS =================
 def add_indicators(df):
+    if df is None or len(df) < ATR_PERIOD:
+        return None  # not enough data, skip symbol
     df["rsi6"] = ta.momentum.RSIIndicator(df["close"], 6).rsi()
     macd = ta.trend.MACD(df["close"])
     df["dif"] = macd.macd()
