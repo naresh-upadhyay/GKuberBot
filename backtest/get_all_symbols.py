@@ -1,14 +1,18 @@
-import pandas as pd
+import json
+import csv
+import os
+from datetime import datetime, UTC
+import sys
 import numpy as np
+import pandas as pd
 from datetime import datetime, timedelta, timezone
 from binance.client import Client
 import ta
 
-# ================= CONFIG =================
-SYMBOLS = ["PEPEUSDT", "DOGEUSDT", "SHIBUSDT", "FLOKIUSDT", "GUNUSDT"]
+
 INTERVAL = Client.KLINE_INTERVAL_4HOUR
 
-LOOKBACK_MONTHS = 1
+LOOKBACK_MONTHS = 51
 RANK_LOOKBACK = 20
 
 INITIAL_BALANCE = 10000.0
@@ -23,6 +27,131 @@ client = Client()
 
 END_DATE = datetime.now(timezone.utc)
 START_DATE = END_DATE - timedelta(days=LOOKBACK_MONTHS * 30)
+
+# ================= CONFIG =================
+OUTPUT_DIR = "data"
+JSON_FILE = f"{OUTPUT_DIR}/binance_spot_symbols.json"
+CSV_FILE  = f"{OUTPUT_DIR}/binance_spot_symbols.csv"
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ================= CLIENT =================
+client = Client()
+
+# ================= FETCH EXCHANGE INFO =================
+exchange_info = client.get_exchange_info()
+
+# ================= FETCH 24H TICKER (VOLUME) =================
+# ✅ Correct method for python-binance
+tickers = client.get_ticker()
+
+# Convert ticker list → dict
+ticker_map = {t["symbol"]: t for t in tickers}
+
+spot_symbols = []
+
+
+# ================= HELPERS =================
+def decimals_from_step(step: float) -> int:
+    step = f"{step:.10f}".rstrip("0")
+    return len(step.split(".")[1]) if "." in step else 0
+
+for s in exchange_info.get("symbols", []):
+
+    if not s.get("isSpotTradingAllowed", False):
+        continue
+    if s.get("status") != "TRADING":
+        continue
+
+    symbol = s["symbol"]
+    ticker = ticker_map.get(symbol, {})
+
+    filters = {f["filterType"]: f for f in s.get("filters", [])}
+    lot = filters.get("LOT_SIZE", {})
+    price_filter = filters.get("PRICE_FILTER", {})
+    min_notional = filters.get("NOTIONAL", {})
+
+    step_size = float(lot.get("stepSize", 0))
+    tick_size = float(price_filter.get("tickSize", 0))
+
+    spot_symbols.append({
+        "symbol": symbol,
+        "baseAsset": s["baseAsset"],
+        "quoteAsset": s["quoteAsset"],
+
+        # ===== 24H MARKET DATA =====
+        "lastPrice": float(ticker.get("lastPrice", 0)),
+        "baseVolume_24h": float(ticker.get("volume", 0)),
+        "quoteVolume_24h": float(ticker.get("quoteVolume", 0)),
+        "tradeCount_24h": int(ticker.get("count", 0)),
+
+        # ===== PRECISION =====
+        "qtyPrecision": decimals_from_step(step_size),
+        "pricePrecision": decimals_from_step(tick_size),
+
+        # ===== FILTERS =====
+        "minQty": float(lot.get("minQty", 0)),
+        "stepSize": step_size,
+        "minNotional": float(min_notional.get("minNotional", 0))
+    })
+
+# ================= VALIDATE =================
+if not spot_symbols:
+    print("❌ No SPOT symbols found")
+    sys.exit(1)
+
+# ================= SAVE JSON =================
+with open(JSON_FILE, "w") as f:
+    json.dump(
+        {
+            "generated_at": datetime.now(UTC).isoformat(),
+            "count": len(spot_symbols),
+            "symbols": spot_symbols
+        },
+        f,
+        indent=2
+    )
+
+# ================= SAVE CSV =================
+with open(CSV_FILE, "w", newline="", encoding="utf-8") as f:
+    writer = csv.DictWriter(f, fieldnames=spot_symbols[0].keys())
+    writer.writeheader()
+    writer.writerows(spot_symbols)
+
+# ================= DONE =================
+print("✅ SUCCESS")
+print(f"📊 SPOT symbols: {len(spot_symbols)}")
+print(f"📄 JSON → {JSON_FILE}")
+print(f"📄 CSV  → {CSV_FILE}")
+
+# ================= FILTER & SORT SYMBOLS =================
+
+usdt_symbols = sorted(
+    [
+        s for s in spot_symbols
+    ],
+    key=lambda x: x.get("quoteVolume_24h", 0),
+    reverse=True
+)
+
+# Extract only symbol names if needed
+symbol_list = [s["symbol"] for s in usdt_symbols]
+
+"""
+
+# ================= PREVIEW =================
+print(f"✅ Filtered USDT symbols: {len(symbol_list)}")
+print("Top 20 by volume:")
+for s in usdt_symbols[:20]:
+    print(
+        s["symbol"],
+        "| volume:", round(s["quoteVolume_24h"], 2),
+        "| minNotional:", s["minNotional"]
+    )
+
+"""
+
+
 
 
 # ================= DATA =================
@@ -49,6 +178,8 @@ def fetch_data(symbol):
 
 
 def add_indicators(df):
+    if df is None or len(df) < ATR_PERIOD:
+        return None  # not enough data, skip symbol
     df["rsi6"] = ta.momentum.RSIIndicator(df["close"], 6).rsi()
 
     macd = ta.trend.MACD(df["close"])
@@ -118,16 +249,23 @@ def backtest_single_coin(df):
 # ================= ELIGIBILITY =================
 eligible = {}
 stats = {}
+eligible_coins_list = []
 
-print("\n===== ROLLING 6-MONTH ELIGIBILITY =====")
+print(f"\n===== ROLLING {LOOKBACK_MONTHS}-MONTH ELIGIBILITY =====")
 
-for sym in SYMBOLS:
+for sym in symbol_list:
     df = add_indicators(fetch_data(sym))
+    if df is None or len(df) < ATR_PERIOD:
+        continue
 
     final_balance, trades, equity = backtest_single_coin(df)
     equity = np.array(equity)
 
     peak = np.maximum.accumulate(equity)
+    if len(equity) < 2 or len(peak) < 2:
+        print("⚠️ No valid trades / equity curve — skipping symbol")
+        continue
+
     max_dd = ((equity - peak) / peak).min() * 100
 
     wins = [t for t in trades if t > 0]
@@ -158,6 +296,23 @@ for sym in SYMBOLS:
     print(f"W/L    : {wl:.2f}")
     print("==========================\n")
 
+    #-----Save to csv start
+
+    eligible_coins_list.append({
+        "Symbol": sym,
+        "Initial Balance" : f"{INITIAL_BALANCE:.2f} USDT",
+        "Final Balance"   : f"{final_balance:.2f} USDT",
+        "Net Profit"      : f"{profit:.2f} USDT ({profit_pct:.2f}%)",
+        "Net Amount" : f"{final_balance:.2f}",
+        "Return" : f"{ret_pct:.2f}%",
+        "Trades" : f"{len(trades)}",
+        "Max DD" : f"{max_dd:.2f}%",
+        "W/L"    : f"{wl:.2f}",
+        "Type": "✅ ELIGIBLE" if ret_pct >= 0 else "❌ DISABLED",
+        "Lookback Months" : LOOKBACK_MONTHS
+    })
+    #-----Save to csv end
+
     if (
         #max_dd >= -15  and
         wl >= 1.8
@@ -174,6 +329,12 @@ for sym in SYMBOLS:
 
 print("\nEligible Coins:", list(eligible.keys()))
 
+# ================= SAVE CSV =================
+CSV_FILE_ELIGIBLE  = f"{OUTPUT_DIR}/binance_eligible_spot_symbols.csv"
+with open(CSV_FILE_ELIGIBLE, "w", newline="", encoding="utf-8") as f:
+    writer = csv.DictWriter(f, fieldnames=eligible_coins_list[0].keys())
+    writer.writeheader()
+    writer.writerows(eligible_coins_list)
 
 # ================= RANKING =================
 def rank_coins_fixed(eligible_data, stats, lookback):
