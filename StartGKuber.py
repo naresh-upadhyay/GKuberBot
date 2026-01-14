@@ -17,7 +17,7 @@ client = Client(API_KEY, API_SECRET)
 
 # ================= CONFIG =================
 SYMBOLS = ["PEPEUSDT", "DOGEUSDT", "SHIBUSDT", "FLOKIUSDT"]
-INTERVAL = Client.KLINE_INTERVAL_4HOUR
+INTERVAL = Client.KLINE_INTERVAL_1MINUTE
 
 INITIAL_BALANCE = 10000.0
 RISK_PER_TRADE = 0.01
@@ -104,11 +104,12 @@ def sell(symbol, price):
 
 # ================= WS CALLBACK =================
 def on_kline(msg):
-    if msg.get("e") != "kline":
+
+    if "k" not in msg:
         return
 
     k = msg["k"]
-
+    print(k["s"], k["i"], "closed =", k["x"], "price =", k["c"])
 
     # only closed candles
     if not k["x"]:
