@@ -2,7 +2,6 @@ from config.loader import load_env
 from config.base import BaseConfig
 from config.binance import BinanceConfig
 from config.fees import FeeConfig
-from config.risk import RiskConfig
 from config.strategy import StrategyConfig
 from config.telegram import TelegramConfig
 from dotenv import load_dotenv
@@ -18,7 +17,6 @@ class Config:
         self.base = BaseConfig()
         self.binance = BinanceConfig()
         self.fees = FeeConfig()
-        self.risk = RiskConfig()
         self.strategy = StrategyConfig()
         self.telegram = TelegramConfig()
 

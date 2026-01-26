@@ -1,6 +1,7 @@
-python-binance
+python-binance==1.0.19
 python-dotenv
 pandas
 requests
 cryptography
 websocket-client
+ta

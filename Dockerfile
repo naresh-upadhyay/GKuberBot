@@ -14,4 +14,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 # EXPOSE 8080
 
 # Entry point
-CMD ["python", "main.py"]
+CMD ["python", "StartGKuber.py"]
