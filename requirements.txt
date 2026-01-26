@@ -5,3 +5,5 @@ requests
 cryptography
 websocket-client
 ta
+flask
+gunicorn

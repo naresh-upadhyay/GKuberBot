@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flask Simple Form</title>
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f8;
+            padding: 40px;
+        }
+        form {
+            background: white;
+            padding: 20px;
+            width: 300px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        input, button {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Simple Flask Form</h2>
+
+<form method="POST">
+    <input type="text" name="name" placeholder="Enter name" required>
+    <input type="email" name="email" placeholder="Enter email" required>
+    <button type="submit">Submit</button>
+</form>
+
+{% if name and email %}
+    <h3>Submitted Data</h3>
+    <p><b>Name:</b> {{ name }}</p>
+    <p><b>Email:</b> {{ email }}</p>
+{% endif %}
+
+</body>
+</html>
