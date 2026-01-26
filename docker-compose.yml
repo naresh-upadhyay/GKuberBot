@@ -2,6 +2,8 @@ services:
   GKuberBot:
     image: nehanareshupadhyay/gkuber:latest
     container_name: gkuberbot
+    ports:
+      - "5000:5000"
     env_file:
       - .env
     restart: unless-stopped
