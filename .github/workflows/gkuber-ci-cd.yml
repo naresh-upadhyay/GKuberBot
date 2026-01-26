@@ -1,13 +1,11 @@
 name: GKuber CI/CD
 
-
 on:
   push:
     branches: [ "master", "development" ]
   pull_request:
     branches: [ "master", "development" ]
-  workflow_dispatch: # to manually run this workflow
-
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -16,6 +14,11 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # 🔐 Create .env from single secret
+      - name: Create .env file
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Login to Docker Hub
         run: |
@@ -39,9 +42,10 @@ jobs:
           script: |
             mkdir -p ~/gkuber
             cd ~/gkuber
-            [ -f docker-compose.yml ] || exit 1
+
+            # 🔐 Create .env on server
+            echo "${{ secrets.ENV_FILE }}" > .env
+
             docker pull ${{ secrets.DOCKER_USERNAME }}/gkuber:latest
             docker compose down || true
             docker compose up -d
-
-
