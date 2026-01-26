@@ -15,7 +15,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 🔐 Create .env from single secret
+      # 🔐 Create .env from secret
       - name: Create .env file
         run: |
           echo "${{ secrets.ENV_FILE }}" > .env
@@ -40,12 +40,30 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
-            mkdir -p ~/gkuber
-            cd ~/gkuber
+            set -e
+
+            # 📁 App directory
+            APP_DIR=~/gkuber
+
+            REPO_URL=https://${{ secrets.ACCESS_TOKEN }}@github.com/${{ github.repository }}.git
+            BRANCH=${{ github.ref_name }}
+
+            if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p $(dirname "$APP_DIR")
+              git clone -b $BRANCH $REPO_URL $APP_DIR
+            fi
+
+            cd $APP_DIR
+            git fetch origin
+            git checkout $BRANCH
+            git pull origin $BRANCH
 
             # 🔐 Create .env on server
             echo "${{ secrets.ENV_FILE }}" > .env
 
+            docker login -u "${{ secrets.DOCKER_USERNAME }}" -p "${{ secrets.DOCKER_PASSWORD }}"
+
             docker pull ${{ secrets.DOCKER_USERNAME }}/gkuber:latest
+
             docker compose down || true
-            docker compose up -d
+            docker compose up -d --remove-orphans
