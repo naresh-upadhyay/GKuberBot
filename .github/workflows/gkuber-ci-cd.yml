@@ -39,7 +39,9 @@ jobs:
           script: |
             mkdir -p ~/gkuber
             cd ~/gkuber
+            [ -f docker-compose.yml ] || exit 1
             docker pull ${{ secrets.DOCKER_USERNAME }}/gkuber:latest
             docker compose down || true
             docker compose up -d
+
 
