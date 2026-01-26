@@ -2,8 +2,8 @@ version: "3.9"
 
 services:
   GKuberBot:
-    build: .
-    container_name: GKuberBot
+    image: nehanareshupadhyay/gkuber:latest
+    container_name: gkuberbot
     env_file:
       - .env
     restart: unless-stopped
