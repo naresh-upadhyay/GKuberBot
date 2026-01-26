@@ -157,6 +157,7 @@ def on_kline(msg):
             sell(symbol, row["close"])
 
 # ================= START BOT =================
+
 def start():
     twm = ThreadedWebsocketManager(API_KEY, API_SECRET)
     twm.start()
