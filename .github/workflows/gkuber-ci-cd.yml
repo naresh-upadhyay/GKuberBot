@@ -37,7 +37,9 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
+            mkdir -p ~/gkuber
             cd ~/gkuber
             docker pull ${{ secrets.DOCKER_USERNAME }}/gkuber:latest
-            docker compose down
+            docker compose down || true
             docker compose up -d
+
