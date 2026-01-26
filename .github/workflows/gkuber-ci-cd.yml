@@ -53,19 +53,19 @@ jobs:
 
             echo "📦 Deploying branch: $BRANCH"
             echo "📁 Directory: $APP_DIR"
+            
+            
 
             # ✅ SAFE git logic
             if [ ! -d ".git" ]; then
               echo "🧹 Not a git repo → fresh clone"
-              rm -rf ./*
-              git clone -b "$BRANCH" "$REPO_URL" .
-            else
-              echo "🔄 Repo exists → pulling"
-              git fetch origin
-              git checkout "$BRANCH"
-              git pull origin "$BRANCH"
+              git init
+              git remote add origin "$REPO_URL"
             fi
-
+            
+            git fetch origin
+            git checkout -B "$BRANCH" "origin/$BRANCH"
+            git reset --hard "origin/$BRANCH"
 
             # 🔐 Create .env on server
             echo "${{ secrets.ENV_FILE }}" > .env
