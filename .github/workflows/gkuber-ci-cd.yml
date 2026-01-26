@@ -47,16 +47,25 @@ jobs:
 
             REPO_URL=https://${{ secrets.ACCESS_TOKEN }}@github.com/${{ github.repository }}.git
             BRANCH=${{ github.ref_name }}
+            
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
 
-            if [ ! -d "$APP_DIR/.git" ]; then
-              mkdir -p $(dirname "$APP_DIR")
-              git clone -b $BRANCH $REPO_URL $APP_DIR
+            echo "📦 Deploying branch: $BRANCH"
+            echo "📁 Directory: $APP_DIR"
+
+            # ✅ SAFE git logic
+            if [ ! -d ".git" ]; then
+              echo "🧹 Not a git repo → fresh clone"
+              rm -rf ./*
+              git clone -b "$BRANCH" "$REPO_URL" .
+            else
+              echo "🔄 Repo exists → pulling"
+              git fetch origin
+              git checkout "$BRANCH"
+              git pull origin "$BRANCH"
             fi
 
-            cd $APP_DIR
-            git fetch origin
-            git checkout $BRANCH
-            git pull origin $BRANCH
 
             # 🔐 Create .env on server
             echo "${{ secrets.ENV_FILE }}" > .env
