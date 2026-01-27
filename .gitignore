@@ -1,0 +1,7 @@
+.env
+.env.backup
+/.env
+/.idea
+/.vscode
+/.vs
+.idea
