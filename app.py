@@ -1,11 +1,11 @@
 from flask import Flask, render_template, request, jsonify
-import json, os
+import json, os, random
 from datetime import datetime
-import random
+from uuid import uuid4
 
 app = Flask(__name__)
 
-# ---------- STATIC DATA ----------
+# ---------------- STATIC DATA ----------------
 COINS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "PEPEUSDT"]
 RSI_VALUES = [20, 30, 40, 50, 60, 70, 80]
 
@@ -25,68 +25,68 @@ CANDLES = [
 
 STRATEGY_FILE = "strategies/saved.json"
 
-
-# ---------- HELPERS ----------
+# ---------------- HELPERS ----------------
 def load_strategies():
     if not os.path.exists(STRATEGY_FILE):
-        return []
-    with open(STRATEGY_FILE) as f:
+        return {}
+    with open(STRATEGY_FILE, "r") as f:
         return json.load(f)
-
 
 def save_strategies(data):
     os.makedirs("strategies", exist_ok=True)
     with open(STRATEGY_FILE, "w") as f:
         json.dump(data, f, indent=4)
 
+def new_strategy_id():
+    return f"STRAT-{uuid4().hex[:10].upper()}"
 
-# ---------- ROUTES ----------
+# ---------------- ROUTES ----------------
 @app.route("/")
 def index():
     strategies = load_strategies()
-    last_strategy = strategies[-1] if strategies else None
+    last_strategy = list(strategies.values())[-1] if strategies else None
 
     return render_template(
         "strategy.html",
+        strategies=strategies,
+        last_strategy=last_strategy,
         coins=COINS,
         rsi_values=RSI_VALUES,
         macd=MACD,
-        candles=CANDLES,
-        strategies=strategies,
-        last_strategy=last_strategy
+        candles=CANDLES
     )
-
 
 @app.route("/save-strategy", methods=["POST"])
 def save_strategy():
-    data = request.json
-    data["id"] = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    data["saved_at"] = datetime.utcnow().isoformat()
-
+    payload = request.json
     strategies = load_strategies()
-    strategies.append(data)
+
+    sid = payload.get("id") or new_strategy_id()
+
+    strategies[sid] = {
+        "id": sid,
+        "name": payload.get("name", f"Strategy {sid}"),
+        "created_at": datetime.utcnow().isoformat(),
+        "config": payload["config"]
+    }
+
     save_strategies(strategies)
 
-    return jsonify({"message": "Strategy saved successfully"})
+    return jsonify({"strategy_id": sid})
 
-
-@app.route("/load-strategy", methods=["POST"])
-def load_strategy():
-    sid = request.json.get("id")
-    for s in load_strategies():
-        if s["id"] == sid:
-            return jsonify(s)
-    return jsonify({"error": "Strategy not found"}), 404
-
+@app.route("/load-strategy/<sid>")
+def load_strategy(sid):
+    strategies = load_strategies()
+    if sid not in strategies:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(strategies[sid])
 
 @app.route("/start-scanner", methods=["POST"])
 def start_scanner():
-    strategy = request.json
+    cfg = request.json
+    results, total_pnl = [], 0.0
 
-    results = []
-    total_pnl = 0.0
-
-    for symbol in strategy["coins"]:
+    for symbol in cfg["coins"]:
         trades = random.randint(5, 20)
         wins = random.randint(0, trades)
         pnl = round(random.uniform(-100, 200), 2)
