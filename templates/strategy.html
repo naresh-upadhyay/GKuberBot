@@ -47,11 +47,22 @@
 <input id="strategy_name" class="form-control mb-3">
 
 <label>Coins</label>
+
+<div class="d-flex gap-2 mb-2">
+    <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllCoins()">
+        Select All
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="unselectAllCoins()">
+        Unselect All
+    </button>
+</div>
+
 <select id="coins" class="form-control mb-3" multiple>
 {% for c in coins %}
 <option>{{ c }}</option>
 {% endfor %}
 </select>
+
 
 <div class="row mb-3">
     <div class="col-md-6">
@@ -266,7 +277,20 @@ function exportStrategy(){
 /* AUTO LOAD LAST */
 const last = {{ last_strategy | tojson | safe }};
 if(last) fill(last);
+
+function selectAllCoins() {
+    const allValues = [];
+    $('#coins option').each(function () {
+        allValues.push($(this).val());
+    });
+    $('#coins').val(allValues).trigger('change');
+}
+
+function unselectAllCoins() {
+    $('#coins').val(null).trigger('change');
+}
 </script>
+
 
 </body>
 </html>
