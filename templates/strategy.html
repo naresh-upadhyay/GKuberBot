@@ -2,25 +2,23 @@
 <html>
 <head>
     <title>Strategy Builder</title>
-
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
-
     <style>
         body { background:#f4f6fa; }
         .card { border-radius:14px; box-shadow:0 10px 25px rgba(0,0,0,.08); }
         label { font-weight:600; font-size:14px; }
     </style>
 </head>
-<body>
 
+<body>
 <div class="container mt-4">
 
 <!-- LOAD STRATEGY -->
 <div class="card p-3 mb-4">
     <label>Saved Strategies</label>
     <div class="row g-2">
-        <div class="col-md-9">
+        <div class="col-md-7">
             <select id="strategySelect" class="form-select">
                 <option value="">-- Select Strategy --</option>
                 {% for sid, s in strategies.items() %}
@@ -28,8 +26,15 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-3">
+
+        <div class="col-md-5 d-flex gap-2">
             <button class="btn btn-primary w-100" onclick="loadStrategy()">Load</button>
+
+            <!-- ✅ NEW -->
+            <button class="btn btn-danger w-100" onclick="deleteStrategy()">Delete</button>
+
+            <!-- ✅ NEW -->
+            <button class="btn btn-secondary w-100" onclick="exportStrategy()">Export</button>
         </div>
     </div>
 </div>
@@ -43,60 +48,81 @@
 
 <label>Coins</label>
 <select id="coins" class="form-control mb-3" multiple>
-{% for c in coins %}<option>{{ c }}</option>{% endfor %}
+{% for c in coins %}
+<option>{{ c }}</option>
+{% endfor %}
 </select>
 
 <div class="row mb-3">
-<div class="col-md-6">
-<label>From</label>
-<input type="date" id="from_date" class="form-control">
-</div>
-<div class="col-md-6">
-<label>To</label>
-<input type="date" id="to_date" class="form-control">
-</div>
+    <div class="col-md-6">
+        <label>From</label>
+        <input type="date" id="from_date" class="form-control">
+    </div>
+    <div class="col-md-6">
+        <label>To</label>
+        <input type="date" id="to_date" class="form-control">
+    </div>
 </div>
 
 <h6>Buy</h6>
 <div class="row mb-3">
-<div class="col-md-4">
-<label>Min RSI</label>
-<select id="buy_rsi_min" class="form-select">{% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}</select>
-</div>
-<div class="col-md-4">
-<label>MACD</label>
-<select id="buy_macd" class="form-select">{% for m in macd %}<option value="{{ m.value }}">{{ m.label }}</option>{% endfor %}</select>
-</div>
-<div class="col-md-4">
-<label>Candle</label>
-<select id="buy_candle" class="form-select">{% for c in candles %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}</select>
-</div>
+    <div class="col-md-4">
+        <label>Min RSI</label>
+        <select id="buy_rsi_min" class="form-select">
+            {% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label>MACD</label>
+        <select id="buy_macd" class="form-select">
+            {% for m in macd %}<option value="{{ m.value }}">{{ m.label }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-md-4">
+        <label>Candle</label>
+        <select id="buy_candle" class="form-select">
+            {% for c in candles %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}
+        </select>
+    </div>
 </div>
 
 <h6>Sell</h6>
 <div class="row mb-4">
-<div class="col-md-3">
-<label>Min RSI</label>
-<select id="sell_rsi_min" class="form-select">{% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}</select>
-</div>
-<div class="col-md-3">
-<label>Max RSI</label>
-<select id="sell_rsi_max" class="form-select">{% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}</select>
-</div>
-<div class="col-md-3">
-<label>MACD</label>
-<select id="sell_macd" class="form-select">{% for m in macd %}<option value="{{ m.value }}">{{ m.label }}</option>{% endfor %}</select>
-</div>
-<div class="col-md-3">
-<label>Candle</label>
-<select id="sell_candle" class="form-select">{% for c in candles %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}</select>
-</div>
+    <div class="col-md-3">
+        <label>Min RSI</label>
+        <select id="sell_rsi_min" class="form-select">
+            {% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label>Max RSI</label>
+        <select id="sell_rsi_max" class="form-select">
+            {% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label>MACD</label>
+        <select id="sell_macd" class="form-select">
+            {% for m in macd %}<option value="{{ m.value }}">{{ m.label }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label>Candle</label>
+        <select id="sell_candle" class="form-select">
+            {% for c in candles %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}
+        </select>
+    </div>
 </div>
 
 <div class="d-flex gap-2">
-<button class="btn btn-outline-primary" onclick="save()">💾 Save</button>
-<button class="btn btn-secondary" onclick="saveAsNew()">🆕 Save As New</button>
-<button class="btn btn-success ms-auto" onclick="run()">▶ Start Scanner</button>
+    <button class="btn btn-outline-primary" onclick="save()">💾 Save</button>
+    <button class="btn btn-secondary" onclick="saveAsNew()">🆕 Save As New</button>
+
+    <!-- existing -->
+    <button class="btn btn-success ms-auto" onclick="run()">▶ Start Scanner</button>
+
+    <!-- ✅ NEW -->
+    <button class="btn btn-warning" onclick="runBacktest()">🔄 Run Backtest</button>
 </div>
 </div>
 
@@ -104,7 +130,15 @@
 <div class="card p-4 mt-4 d-none" id="results">
 <h5>📈 Results</h5>
 <table class="table table-bordered">
-<thead><tr><th>Symbol</th><th>Trades</th><th>Wins</th><th>Win %</th><th>PnL</th></tr></thead>
+<thead>
+<tr>
+    <th>Symbol</th>
+    <th>Trades</th>
+    <th>Wins</th>
+    <th>Win %</th>
+    <th>PnL</th>
+</tr>
+</thead>
 <tbody id="resBody"></tbody>
 </table>
 <h5 class="text-end">🔥 TOTAL PnL: <span id="total"></span></h5>
@@ -116,16 +150,16 @@
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 <script>
-$('#coins').select2({width:'100%'});
+$('#coins').select2({ width:'100%' });
 
 let currentId = null;
 
 function collect() {
     return {
         coins: $('#coins').val(),
-        date_range:{from:from_date.value,to:to_date.value},
-        buy:{rsi_min:buy_rsi_min.value,macd:buy_macd.value,candle:buy_candle.value},
-        sell:{rsi_min:sell_rsi_min.value,rsi_max:sell_rsi_max.value,macd:sell_macd.value,candle:sell_candle.value}
+        date_range:{ from:from_date.value, to:to_date.value },
+        buy:{ rsi_min:buy_rsi_min.value, macd:buy_macd.value, candle:buy_candle.value },
+        sell:{ rsi_min:sell_rsi_min.value, rsi_max:sell_rsi_max.value, macd:sell_macd.value, candle:sell_candle.value }
     };
 }
 
@@ -133,12 +167,15 @@ function fill(s){
     currentId = s.id;
     strategy_name.value = s.name;
     const c = s.config;
+
     $('#coins').val(c.coins).trigger('change');
     from_date.value = c.date_range.from;
     to_date.value = c.date_range.to;
+
     buy_rsi_min.value = c.buy.rsi_min;
     buy_macd.value = c.buy.macd;
     buy_candle.value = c.buy.candle;
+
     sell_rsi_min.value = c.sell.rsi_min;
     sell_rsi_max.value = c.sell.rsi_max;
     sell_macd.value = c.sell.macd;
@@ -155,36 +192,78 @@ function save(){
     fetch('/save-strategy',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:currentId,name:strategy_name.value,config:collect()})
-    }).then(r=>r.json()).then(d=>{currentId=d.strategy_id;location.reload();});
+        body:JSON.stringify({ id:currentId, name:strategy_name.value, config:collect() })
+    }).then(r=>r.json()).then(d=>{
+        currentId = d.strategy_id;
+        location.reload();
+    });
 }
 
 function saveAsNew(){
-    currentId=null;
+    currentId = null;
     strategy_name.value += " (Copy)";
     save();
 }
 
+/* EXISTING SCANNER */
 function run(){
     fetch('/start-scanner',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify(collect())
-    }).then(r=>r.json()).then(d=>{
-        resBody.innerHTML="";
-        d.results.forEach(r=>{
-            resBody.innerHTML+=`<tr>
-                <td>${r.symbol}</td><td>${r.trades}</td>
-                <td>${r.wins}</td>
-                <td>${((r.wins/r.trades)*100).toFixed(2)}%</td>
-                <td>${r.pnl.toFixed(2)}</td></tr>`;
-        });
-        total.innerText=d.total_pnl.toFixed(2);
-        results.classList.remove('d-none');
-    });
+    }).then(r=>r.json()).then(renderResults);
 }
 
-// auto load last
+/* ✅ NEW REAL BACKTEST */
+function runBacktest(){
+    fetch('/run-backtest',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(collect())
+    }).then(r=>r.json()).then(renderResults);
+}
+
+/* SHARED RESULT RENDER */
+function renderResults(d){
+    resBody.innerHTML = "";
+    d.symbols ? d.symbols.forEach(r=>{
+        resBody.innerHTML += `
+        <tr>
+            <td>${r.symbol}</td>
+            <td>${r.trades}</td>
+            <td>${r.wins}</td>
+            <td>${((r.wins/r.trades)*100).toFixed(2)}%</td>
+            <td>${r.pnl.toFixed(2)}</td>
+        </tr>`;
+    }) : d.results.forEach(r=>{
+        resBody.innerHTML += `
+        <tr>
+            <td>${r.symbol}</td>
+            <td>${r.trades}</td>
+            <td>${r.wins}</td>
+            <td>${((r.wins/r.trades)*100).toFixed(2)}%</td>
+            <td>${r.pnl.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    total.innerText = (d.total_pnl ?? d.total_pnl).toFixed(2);
+    results.classList.remove('d-none');
+}
+
+/* ✅ NEW DELETE */
+function deleteStrategy(){
+    if(!currentId || !confirm("Delete this strategy?")) return;
+    fetch(`/delete-strategy/${currentId}`, { method:'DELETE' })
+        .then(()=>location.reload());
+}
+
+/* ✅ NEW EXPORT */
+function exportStrategy(){
+    if(!currentId) return alert("No strategy loaded");
+    window.open(`/export-strategy/${currentId}`, '_blank');
+}
+
+/* AUTO LOAD LAST */
 const last = {{ last_strategy | tojson | safe }};
 if(last) fill(last);
 </script>
