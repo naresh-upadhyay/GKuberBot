@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Strategy Builder</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet">
+
+    <style>
+        body { background:#f4f6fa; }
+        .card { border-radius:14px; box-shadow:0 10px 25px rgba(0,0,0,.08); }
+        label { font-weight:600; font-size:14px; }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+
+<!-- LOAD STRATEGY -->
+<div class="card p-3 mb-4">
+    <label>Saved Strategies</label>
+    <div class="row g-2">
+        <div class="col-md-9">
+            <select id="strategySelect" class="form-select">
+                <option value="">-- Select Strategy --</option>
+                {% for s in strategies %}
+                <option value="{{ s.id }}">
+                    Strategy {{ loop.index }} ({{ s.saved_at }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button class="btn btn-primary w-100" onclick="loadSelectedStrategy()">
+                Load Strategy
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- BUILDER -->
+<div class="card p-4">
+<h4 class="text-center mb-4">📊 Strategy Builder</h4>
+
+<label>Coins</label>
+<select id="coins" class="form-control mb-3" multiple>
+{% for c in coins %}
+<option value="{{ c }}">{{ c }}</option>
+{% endfor %}
+</select>
+
+<div class="row mb-3">
+<div class="col-md-6">
+<label>From Date</label>
+<input type="date" id="from_date" class="form-control">
+</div>
+<div class="col-md-6">
+<label>To Date</label>
+<input type="date" id="to_date" class="form-control">
+</div>
+</div>
+
+<h6>Buy Conditions</h6>
+<div class="row mb-3">
+<div class="col-md-4">
+<label>Min RSI</label>
+<select id="buy_rsi_min" class="form-select">
+{% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}
+</select>
+</div>
+<div class="col-md-4">
+<label>MACD</label>
+<select id="buy_macd" class="form-select">
+{% for m in macd %}<option value="{{ m.value }}">{{ m.label }}</option>{% endfor %}
+</select>
+</div>
+<div class="col-md-4">
+<label>Candle Interval</label>
+<select id="buy_candle" class="form-select">
+{% for c in candles %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}
+</select>
+</div>
+</div>
+
+<h6>Sell Conditions</h6>
+<div class="row mb-4">
+<div class="col-md-3">
+<label>Min RSI</label>
+<select id="sell_rsi_min" class="form-select">
+{% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}
+</select>
+</div>
+<div class="col-md-3">
+<label>Max RSI</label>
+<select id="sell_rsi_max" class="form-select">
+{% for r in rsi_values %}<option>{{ r }}</option>{% endfor %}
+</select>
+</div>
+<div class="col-md-3">
+<label>MACD</label>
+<select id="sell_macd" class="form-select">
+{% for m in macd %}<option value="{{ m.value }}">{{ m.label }}</option>{% endfor %}
+</select>
+</div>
+<div class="col-md-3">
+<label>Candle Interval</label>
+<select id="sell_candle" class="form-select">
+{% for c in candles %}<option value="{{ c.value }}">{{ c.label }}</option>{% endfor %}
+</select>
+</div>
+</div>
+
+<div class="d-flex justify-content-between">
+<button class="btn btn-outline-primary" onclick="saveStrategy()">💾 Save Strategy</button>
+<button class="btn btn-success" onclick="startScanner()">▶ Start Scanner</button>
+</div>
+</div>
+
+<!-- RESULTS -->
+<div class="card p-4 mt-4 d-none" id="resultsCard">
+<h5>📈 Results</h5>
+<table class="table table-bordered">
+<thead>
+<tr>
+<th>Symbol</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>PnL</th>
+</tr>
+</thead>
+<tbody id="resultsBody"></tbody>
+</table>
+<h5 class="text-end">🔥 TOTAL PnL: <span id="totalPnl"></span></h5>
+</div>
+
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+$('#coins').select2({ width:'100%' });
+
+function fillForm(s) {
+    $('#coins').val(s.coins).trigger('change');
+    $('#from_date').val(s.date_range.from);
+    $('#to_date').val(s.date_range.to);
+
+    $('#buy_rsi_min').val(s.buy.rsi_min);
+    $('#buy_macd').val(s.buy.macd);
+    $('#buy_candle').val(s.buy.candle);
+
+    $('#sell_rsi_min').val(s.sell.rsi_min);
+    $('#sell_rsi_max').val(s.sell.rsi_max);
+    $('#sell_macd').val(s.sell.macd);
+    $('#sell_candle').val(s.sell.candle);
+}
+
+function loadSelectedStrategy() {
+    const id = $('#strategySelect').val();
+    if (!id) {
+        alert("Please select a strategy first");
+        return;
+    }
+
+    fetch('/load-strategy', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id})
+    })
+    .then(r => r.json())
+    .then(fillForm);
+}
+
+// Auto-load last strategy on refresh
+const lastStrategy = {{ last_strategy | tojson | safe }};
+if (lastStrategy) fillForm(lastStrategy);
+
+function collect() {
+    return {
+        coins: $('#coins').val(),
+        date_range: { from: from_date.value, to: to_date.value },
+        buy: { rsi_min: buy_rsi_min.value, macd: buy_macd.value, candle: buy_candle.value },
+        sell: { rsi_min: sell_rsi_min.value, rsi_max: sell_rsi_max.value, macd: sell_macd.value, candle: sell_candle.value }
+    };
+}
+
+function saveStrategy() {
+    fetch('/save-strategy', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(collect())
+    }).then(r => r.json()).then(d => alert(d.message));
+}
+
+function startScanner() {
+    fetch('/start-scanner', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(collect())
+    })
+    .then(r=>r.json())
+    .then(d=>{
+        $('#resultsBody').empty();
+        d.results.forEach(r=>{
+            $('#resultsBody').append(`
+                <tr>
+                    <td>${r.symbol}</td>
+                    <td>${r.trades}</td>
+                    <td>${r.wins}</td>
+                    <td>${((r.wins/r.trades)*100).toFixed(2)}%</td>
+                    <td>${r.pnl.toFixed(2)}</td>
+                </tr>
+            `);
+        });
+        $('#totalPnl').text(d.total_pnl.toFixed(2));
+        $('#resultsCard').removeClass('d-none');
+    });
+}
+</script>
+
+</body>
+</html>

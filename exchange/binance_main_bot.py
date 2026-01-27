@@ -83,7 +83,7 @@ class BinanceATRBot:
             risk_amt / (price - s["sl"]),
             s["balance"] / price,
         )
-        qty = round(qty, 0)
+        qty = float(qty)
 
         if qty <= 0:
             return
