@@ -12,8 +12,8 @@ class MultiCoinBacktester:
     def __init__(
         self,
         symbols,
-        interval=Client.KLINE_INTERVAL_1MINUTE,
-        start_str="1 month ago UTC",
+        interval=Client.KLINE_INTERVAL_4HOUR,
+        start_str="12 month ago UTC",
         initial_balance=10000.0,
         risk_per_trade=0.01,
         fee_pct=0.001,
@@ -69,7 +69,7 @@ class MultiCoinBacktester:
     # ================= DATA =================
     def fetch_klines(self, symbol):
         klines = self.client.get_historical_klines(
-            symbol, self.interval, START_DATE, END_DATE
+            symbol, self.interval, self.start_str
         )
 
         df = pd.DataFrame(
@@ -92,7 +92,9 @@ class MultiCoinBacktester:
 
         df = df[["time", "open", "high", "low", "close", "volume"]]
         df["time"] = pd.to_datetime(df["time"], unit="ms")
-        df = df.astype(float, errors="ignore")
+        num_cols = ["open", "high", "low", "close", "volume"]
+        #pd.set_option("display.float_format", "{:.8e}".format)
+        df[num_cols] = df[num_cols].apply(pd.to_numeric)
 
         return self.add_indicators(df)
 
@@ -103,7 +105,8 @@ class MultiCoinBacktester:
 
         risk_amt = s["balance"] * self.risk_per_trade
         qty = min(risk_amt / (price - sl), s["balance"] / price)
-        qty = round(qty, 0)
+        #qty = round(qty, 0)
+        qty = float(qty)
 
         if qty <= 0:
             return
@@ -198,6 +201,6 @@ class MultiCoinBacktester:
 if __name__ == "__main__":
     bt = MultiCoinBacktester(
         symbols=["PEPEUSDT", "DOGEUSDT", "SHIBUSDT", "FLOKIUSDT"],
-        start_str="30 days ago UTC",
+        start_str="300 days ago UTC",
     )
     bt.run()
